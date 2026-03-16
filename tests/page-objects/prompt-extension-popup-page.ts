@@ -57,6 +57,57 @@ export class PromptExtensionPopupPage {
   }
 
   /**
+   * Verifies that the popup exposes the key user-facing controls required by the assignment.
+   */
+  async assertUiElements(): Promise<void> {
+    const page = await this.ensurePage();
+    this.logger.info('Asserting extension popup UI controls');
+
+    await expect(this.apiDomainInput(page)).toBeVisible();
+    await expect(this.apiKeyInput(page)).toBeVisible();
+    await expect(this.downloadLogsButton(page)).toBeVisible();
+    await expect(this.clearLogsButton(page)).toBeVisible();
+  }
+
+  /**
+   * Verifies that the popup displays the expected signed-in user email when configured.
+   */
+  async assertUserEmail(): Promise<void> {
+    const page = await this.ensurePage();
+
+    if (!this.runtimeConfig.expectedUserEmail) {
+      this.logger.warn('Skipping popup user-email assertion because no expected email is configured');
+      return;
+    }
+
+    this.logger.info('Asserting extension popup user email', {
+      expectedUserEmail: this.runtimeConfig.expectedUserEmail
+    });
+
+    await expect(page.locator('#user')).toBeVisible();
+    await expect(page.locator('#email')).toHaveText(this.runtimeConfig.expectedUserEmail);
+  }
+
+  /**
+   * Clicks the popup button that asks the extension to export its debug logs.
+   */
+  async downloadLogs(): Promise<void> {
+    const page = await this.ensurePage();
+    this.logger.info('Triggering extension log download from the popup UI');
+    await this.downloadLogsButton(page).click();
+  }
+
+  /**
+   * Clicks the popup button that clears the extension logs and waits for its feedback message.
+   */
+  async clearLogs(): Promise<void> {
+    const page = await this.ensurePage();
+    this.logger.info('Clearing extension logs from the popup UI');
+    await this.clearLogsButton(page).click();
+    await expect(page.locator('#clearLogsMessage')).toBeVisible();
+  }
+
+  /**
    * Closes the popup page when the caller is done using it.
    */
   async close(): Promise<void> {
@@ -100,5 +151,18 @@ export class PromptExtensionPopupPage {
   private saveButton(page: Page): Locator {
     return page.locator('#saveButton');
   }
-}
 
+  /**
+   * Locates the popup button that downloads the extension logs.
+   */
+  private downloadLogsButton(page: Page): Locator {
+    return page.locator('#downloadLogsButton');
+  }
+
+  /**
+   * Locates the popup button that clears the extension logs.
+   */
+  private clearLogsButton(page: Page): Locator {
+    return page.locator('#clearLogsButton');
+  }
+}

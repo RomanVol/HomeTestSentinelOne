@@ -20,3 +20,15 @@ export const genAiApplications: readonly GenAiApplicationDefinition[] = [
   }
 ] as const;
 
+/**
+ * Resolves an application definition by key so other tests can select a target dynamically.
+ */
+export function getGenAiApplicationByKey(key: string): GenAiApplicationDefinition {
+  const application = genAiApplications.find((candidate) => candidate.key === key);
+
+  if (!application) {
+    throw new Error(`Unknown GenAI application key "${key}". Update HOME_TEST_LOG_TEST_APPLICATION_KEY or tests/data/genai-applications.ts.`);
+  }
+
+  return application;
+}

@@ -8,6 +8,8 @@ The framework validates the requested policy:
 
 - `chatgpt.com` must be allowed
 - `gemini.google.com` must be blocked
+- the extension popup UI must remain functional
+- the exported extension log file must contain configurable evidence that the policy behavior occurred
 
 The project is built to be:
 
@@ -84,8 +86,14 @@ Override it with environment variables when needed.
 | `HOME_TEST_EDGE_CHANNEL` | Browser channel for the Edge project | `msedge` |
 | `HOME_TEST_API_DOMAIN` | Prompt Security API domain | `eu.prompt.security` |
 | `HOME_TEST_API_KEY` | Prompt Security API key | provided home-test key |
+| `HOME_TEST_EXPECTED_USER_EMAIL` | Expected user email shown in the popup | `romavolman@gmail.com` |
 | `HOME_TEST_TARGET_BROWSERS` | Comma-separated Playwright projects | `chrome-extension` |
 | `HOME_TEST_BLOCK_TEXTS` | Comma-separated blocked-page text hints | `Access Denied,blocked by your administrator` |
+| `HOME_TEST_LOG_DOWNLOAD_DIR` | Browser download directory used for exported logs | `~/Downloads` |
+| `HOME_TEST_LOG_FILE_NAME` | Exported log filename | `prompt_security_extension_debug_logs.txt` |
+| `HOME_TEST_LOG_ASSERTIONS` | Comma-separated snippets that must exist in the downloaded log file | `gemini.google.com,Blocking access to domain gemini.google.com` |
+| `HOME_TEST_CLEARED_LOG_ASSERTIONS` | Comma-separated snippets that must disappear after clearing logs | same as `HOME_TEST_LOG_ASSERTIONS` |
+| `HOME_TEST_LOG_TEST_APPLICATION_KEY` | GenAI application key used to generate the log evidence | `gemini` |
 | `HOME_TEST_NAVIGATION_TIMEOUT_MS` | Navigation timeout | `30000` |
 | `HOME_TEST_ASSERTION_TIMEOUT_MS` | Poll/assertion timeout | `20000` |
 
@@ -97,6 +105,17 @@ Override it with environment variables when needed.
 - `npm run test:chrome` runs only the Chrome-extension project.
 - `npm run test:edge` runs only the Edge-extension project.
 - `npm run typecheck` runs TypeScript checks.
+
+## UI And Log Coverage
+
+The popup UI suite in [extension-ui.spec.ts](/Users/roma/PlaywrightExtention/tests/specs/extension-ui.spec.ts):
+
+- validates the popup fields and buttons by their real DOM ids
+- validates the displayed user email
+- triggers a policy event on a configurable application
+- exports the extension logs through the popup UI
+- validates the downloaded file contents using configurable expected snippets
+- clears the logs through the popup UI and verifies the same snippets are no longer present in the next export
 
 ## CI
 

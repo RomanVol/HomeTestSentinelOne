@@ -42,7 +42,13 @@ export interface RuntimeConfig {
   edgeChannel: string;
   apiDomain: string;
   apiKey: string;
+  expectedUserEmail: string;
   blockTexts: string[];
+  logDownloadDirectory: string;
+  logFileName: string;
+  logAssertions: string[];
+  clearedLogAssertions: string[];
+  logTestApplicationKey: string;
   navigationTimeoutMs: number;
   assertionTimeoutMs: number;
   targetBrowsers: HomeTestProjectName[];

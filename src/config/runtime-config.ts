@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import type { PlaywrightTestConfig, Project } from '@playwright/test';
@@ -81,7 +82,21 @@ export function loadRuntimeConfig(): RuntimeConfig {
     edgeChannel: readString('HOME_TEST_EDGE_CHANNEL', 'msedge'),
     apiDomain: readString('HOME_TEST_API_DOMAIN', 'eu.prompt.security'),
     apiKey: readString('HOME_TEST_API_KEY', 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'),
+    expectedUserEmail: readString('HOME_TEST_EXPECTED_USER_EMAIL', 'romavolman@gmail.com'),
     blockTexts: readList('HOME_TEST_BLOCK_TEXTS', ['Access Denied', 'blocked by your administrator']),
+    logDownloadDirectory: path.resolve(
+      readString('HOME_TEST_LOG_DOWNLOAD_DIR', path.join(process.env.HOME || os.homedir(), 'Downloads'))
+    ),
+    logFileName: readString('HOME_TEST_LOG_FILE_NAME', 'prompt_security_extension_debug_logs.txt'),
+    logAssertions: readList('HOME_TEST_LOG_ASSERTIONS', [
+      'gemini.google.com',
+      'Blocking access to domain gemini.google.com'
+    ]),
+    clearedLogAssertions: readList('HOME_TEST_CLEARED_LOG_ASSERTIONS', [
+      'gemini.google.com',
+      'Blocking access to domain gemini.google.com'
+    ]),
+    logTestApplicationKey: readString('HOME_TEST_LOG_TEST_APPLICATION_KEY', 'gemini'),
     navigationTimeoutMs: readNumber('HOME_TEST_NAVIGATION_TIMEOUT_MS', 30_000),
     assertionTimeoutMs: readNumber('HOME_TEST_ASSERTION_TIMEOUT_MS', 20_000),
     targetBrowsers: configuredProjects.length > 0 ? configuredProjects : ['chrome-extension']

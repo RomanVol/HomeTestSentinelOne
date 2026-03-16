@@ -21,6 +21,7 @@ import type {
 import { PromptExtensionPopupPage } from '../page-objects/prompt-extension-popup-page';
 import { GenAiApplicationPage } from '../page-objects/genai-application-page';
 import { PolicyEvaluator } from '../services/policy-evaluator';
+import { ExtensionLogFileService } from '../services/extension-log-file-service';
 
 type HomeTestFixtures = {
   logger: StepLogger;
@@ -31,6 +32,7 @@ type HomeTestFixtures = {
   extensionPopupPage: PromptExtensionPopupPage | null;
   applicationPage: GenAiApplicationPage;
   policyEvaluator: PolicyEvaluator;
+  extensionLogFileService: ExtensionLogFileService;
 };
 
 /**
@@ -91,6 +93,7 @@ async function launchExtensionContext(
   const context = await chromium.launchPersistentContext(userDataDir, {
     channel,
     headless: Boolean(process.env.CI),
+    downloadsPath: runtimeConfig.logDownloadDirectory,
     args: [
       `--disable-extensions-except=${runtimeConfig.extensionPath}`,
       `--load-extension=${runtimeConfig.extensionPath}`
@@ -250,6 +253,15 @@ export const test = base.extend<HomeTestFixtures>({
    */
   policyEvaluator: async ({ runtimeConfig, logger }, use) => {
     await use(new PolicyEvaluator(runtimeConfig, logger));
+  },
+
+  /**
+   * Creates the service that manages the downloaded extension log file on disk.
+   */
+  extensionLogFileService: async ({ runtimeConfig, logger }, use) => {
+    const service = new ExtensionLogFileService(runtimeConfig, logger);
+    await service.ensureDownloadDirectory();
+    await use(service);
   }
 });
 
