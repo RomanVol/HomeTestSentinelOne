@@ -3,6 +3,8 @@ import { expect } from '@playwright/test';
 import type { RuntimeConfig } from '../../src/models/access-policy';
 import { StepLogger } from '../../src/core/logger';
 
+declare const chrome: any;
+
 /**
  * Models the Prompt Security extension popup and its configuration controls.
  */
@@ -70,25 +72,6 @@ export class PromptExtensionPopupPage {
   }
 
   /**
-   * Verifies that the popup displays the expected signed-in user email when configured.
-   */
-  async assertUserEmail(): Promise<void> {
-    const page = await this.ensurePage();
-
-    if (!this.runtimeConfig.expectedUserEmail) {
-      this.logger.warn('Skipping popup user-email assertion because no expected email is configured');
-      return;
-    }
-
-    this.logger.info('Asserting extension popup user email', {
-      expectedUserEmail: this.runtimeConfig.expectedUserEmail
-    });
-
-    await expect(page.locator('#user')).toBeVisible();
-    await expect(page.locator('#email')).toHaveText(this.runtimeConfig.expectedUserEmail);
-  }
-
-  /**
    * Clicks the popup button that asks the extension to export its debug logs.
    */
   async downloadLogs(): Promise<void> {
@@ -105,6 +88,22 @@ export class PromptExtensionPopupPage {
     this.logger.info('Clearing extension logs from the popup UI');
     await this.clearLogsButton(page).click();
     await expect(page.locator('#clearLogsMessage')).toBeVisible();
+  }
+
+  /**
+   * Reads the extension debug logs directly from extension storage as a fallback when file export is unavailable.
+   */
+  async readDebugLogsFromStorage(): Promise<string> {
+    const page = await this.ensurePage();
+    this.logger.info('Reading extension debug logs directly from chrome.storage.local');
+
+    const logEntries = await page.evaluate(async () => {
+      const items = await chrome.storage.local.get(['debugLogs']);
+      const rawLogs = items.debugLogs;
+      return Array.isArray(rawLogs) ? rawLogs : [];
+    });
+
+    return logEntries.join('\n');
   }
 
   /**

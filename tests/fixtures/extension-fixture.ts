@@ -22,6 +22,7 @@ import { PromptExtensionPopupPage } from '../page-objects/prompt-extension-popup
 import { GenAiApplicationPage } from '../page-objects/genai-application-page';
 import { PolicyEvaluator } from '../services/policy-evaluator';
 import { ExtensionLogFileService } from '../services/extension-log-file-service';
+import { NetworkPolicyObserver } from '../services/network-policy-observer';
 
 type HomeTestFixtures = {
   logger: StepLogger;
@@ -33,6 +34,8 @@ type HomeTestFixtures = {
   applicationPage: GenAiApplicationPage;
   policyEvaluator: PolicyEvaluator;
   extensionLogFileService: ExtensionLogFileService;
+  networkPolicyObserver: NetworkPolicyObserver;
+  failureLogDiagnostics: void;
 };
 
 /**
@@ -87,6 +90,7 @@ async function launchExtensionContext(
   logger.info('Launching persistent context with extension', {
     projectName,
     channel,
+    extensionSource: runtimeConfig.extensionSource,
     extensionPath: runtimeConfig.extensionPath
   });
 
@@ -124,11 +128,22 @@ async function launchStandardContext(projectName: HomeTestProjectName, logger: S
 /**
  * Resolves the extension id from the extension service worker if one is loaded.
  */
-async function resolveExtensionId(context: BrowserContext, logger: StepLogger): Promise<string | null> {
+async function resolveExtensionId(
+  context: BrowserContext,
+  runtimeConfig: RuntimeConfig,
+  logger: StepLogger
+): Promise<string | null> {
   const serviceWorker =
     context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker', { timeout: 10_000 }).catch(() => null));
 
   if (!serviceWorker) {
+    if (runtimeConfig.extensionId) {
+      logger.warn('No extension service worker was observed; using the configured extension id as a fallback', {
+        configuredExtensionId: runtimeConfig.extensionId
+      });
+      return runtimeConfig.extensionId;
+    }
+
     logger.warn('No extension service worker was observed while resolving the extension id');
     return null;
   }
@@ -194,7 +209,7 @@ export const test = base.extend<HomeTestFixtures>({
   browserSession: async ({ context, runtimeConfig, logger }, use, testInfo) => {
     const projectName = testInfo.project.name as HomeTestProjectName;
     const extensionSupported = supportsExtensionAutomation(projectName, runtimeConfig);
-    const extensionId = extensionSupported ? await resolveExtensionId(context, logger) : null;
+    const extensionId = extensionSupported ? await resolveExtensionId(context, runtimeConfig, logger) : null;
     const extensionLoaded = Boolean(extensionSupported && extensionId);
     const browserFlavor = getBrowserFlavor(projectName);
 
@@ -245,7 +260,7 @@ export const test = base.extend<HomeTestFixtures>({
    * Creates the application page object wrapper used by the specs.
    */
   applicationPage: async ({ page, runtimeConfig, logger }, use) => {
-    await use(new GenAiApplicationPage(page, runtimeConfig.navigationTimeoutMs, logger));
+    await use(new GenAiApplicationPage(page, runtimeConfig, logger));
   },
 
   /**
@@ -261,8 +276,120 @@ export const test = base.extend<HomeTestFixtures>({
   extensionLogFileService: async ({ runtimeConfig, logger }, use) => {
     const service = new ExtensionLogFileService(runtimeConfig, logger);
     await service.ensureDownloadDirectory();
+    await service.ensurePersistedLogDirectory();
     await use(service);
-  }
+  },
+
+  /**
+   * Creates the network observer used by tests that validate request-level behavior.
+   */
+  networkPolicyObserver: async ({ page, runtimeConfig, logger }, use) => {
+    await use(new NetworkPolicyObserver(page, runtimeConfig, logger));
+  },
+
+  /**
+   * Automatically exports extension logs for failed tests and prints the matching error lines.
+   */
+  failureLogDiagnostics: [async ({
+    runtimeConfig,
+    browserSession,
+    extensionPopupPage,
+    extensionLogFileService,
+    logger
+  }, use, testInfo) => {
+    await use();
+
+    const testFailed = testInfo.status !== testInfo.expectedStatus;
+
+    if (!testFailed) {
+      return;
+    }
+
+    if (!browserSession.extensionLoaded || !extensionPopupPage) {
+      logger.warn('Skipping failure log diagnostics because the extension popup is unavailable');
+      return;
+    }
+
+    try {
+      logger.info('Collecting extension logs because the test failed', {
+        testTitle: testInfo.title
+      });
+
+      await extensionLogFileService.deleteExistingLogFile();
+      await extensionPopupPage.open();
+      await extensionPopupPage.downloadLogs();
+      let logContents = '';
+      let logSource: 'downloaded-file' | 'extension-storage' = 'downloaded-file';
+
+      try {
+        logContents = await extensionLogFileService.waitForDownloadedLogContents();
+      } catch (downloadError) {
+        logger.warn('Downloaded log file was not created in time; falling back to extension storage logs', {
+          error: downloadError instanceof Error ? downloadError.message : String(downloadError)
+        });
+
+        logContents = await extensionPopupPage.readDebugLogsFromStorage();
+        logSource = 'extension-storage';
+      }
+
+      const persistedLogPath = await extensionLogFileService.persistLogContents(
+        logContents,
+        `${testInfo.project.name}-${testInfo.title}-extension-debug-log`
+      );
+
+      const relevantErrorLines = extensionLogFileService.extractRelevantErrorLines(logContents);
+      const diagnosticLines = relevantErrorLines.length > 0
+        ? relevantErrorLines
+        : extensionLogFileService.extractTailLines(logContents);
+
+      if (logSource === 'downloaded-file') {
+        const logFilePath = extensionLogFileService.resolveLogFilePath();
+
+        await testInfo.attach('extension-debug-log', {
+          path: logFilePath,
+          contentType: 'text/plain'
+        });
+      } else {
+        await testInfo.attach('extension-debug-log', {
+          body: logContents,
+          contentType: 'text/plain'
+        });
+      }
+
+      await testInfo.attach('persisted-extension-debug-log', {
+        path: persistedLogPath,
+        contentType: 'text/plain'
+      });
+
+      if (diagnosticLines.length > 0) {
+        const renderedErrorLines = diagnosticLines.join('\n');
+
+        await testInfo.attach('extension-debug-log-errors', {
+          body: renderedErrorLines,
+          contentType: 'text/plain'
+        });
+
+        logger.error('Relevant extension diagnostic lines extracted for the failed test', {
+          logSource,
+          matchingLines: diagnosticLines
+        });
+
+        console.log('\n[Extension Failure Logs]');
+        console.log(`[Source: ${logSource}]`);
+        console.log(`[Persisted File: ${persistedLogPath}]`);
+        console.log(renderedErrorLines);
+      } else {
+        logger.warn('The exported extension log file did not contain any diagnostic lines', {
+          logSource,
+          patterns: runtimeConfig.failureLogPatterns
+        });
+      }
+    } catch (error) {
+      logger.error('Automatic failure log diagnostics failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }, { auto: true }]
 });
 
 export const expect = test.expect;

@@ -1,7 +1,7 @@
 import { genAiApplications } from '../data/genai-applications';
 import { test } from '../fixtures/extension-fixture';
 
-test.describe('Prompt Security access policy enforcement', () => {
+test.describe('Prompt Security browser UI access policy enforcement', () => {
   for (const application of genAiApplications) {
     test(`${application.expectedPolicy.toUpperCase()} ${application.name}`, async ({
       logger,
@@ -64,4 +64,3 @@ test.describe('Prompt Security access policy enforcement', () => {
     });
   }
 });
-

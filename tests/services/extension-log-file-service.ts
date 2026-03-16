@@ -25,6 +25,17 @@ export class ExtensionLogFileService {
   }
 
   /**
+   * Ensures that the configured persisted-log directory exists before tests write storage logs to disk.
+   */
+  async ensurePersistedLogDirectory(): Promise<void> {
+    this.logger.info('Ensuring the persisted extension-log directory exists', {
+      persistedLogDirectory: this.runtimeConfig.persistedLogDirectory
+    });
+
+    await fs.mkdir(this.runtimeConfig.persistedLogDirectory, { recursive: true });
+  }
+
+  /**
    * Removes any stale downloaded log file so a new export can be detected deterministically.
    */
   async deleteExistingLogFile(): Promise<void> {
@@ -66,6 +77,16 @@ export class ExtensionLogFileService {
   }
 
   /**
+   * Writes the provided log contents to a deterministic file under the configured persisted-log directory.
+   */
+  async persistLogContents(logContents: string, fileLabel: string): Promise<string> {
+    const persistedLogPath = this.resolvePersistedLogPath(fileLabel);
+    this.logger.info('Persisting extension log contents to a project file', { persistedLogPath });
+    await fs.writeFile(persistedLogPath, logContents, 'utf8');
+    return persistedLogPath;
+  }
+
+  /**
    * Asserts that all configured required log snippets are present in the exported file.
    */
   assertContainsConfiguredEntries(logContents: string): void {
@@ -92,9 +113,54 @@ export class ExtensionLogFileService {
   }
 
   /**
+   * Extracts relevant error lines from the exported log file using the configured failure patterns.
+   */
+  extractRelevantErrorLines(logContents: string): string[] {
+    const normalizedLines = logContents
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const matchedLines = normalizedLines.filter((line) =>
+      this.runtimeConfig.failureLogPatterns.some((pattern) =>
+        line.toLowerCase().includes(pattern.toLowerCase())
+      )
+    );
+
+    if (matchedLines.length > 0) {
+      return matchedLines;
+    }
+
+    return normalizedLines.filter((line) => /\berror\b/i.test(line));
+  }
+
+  /**
+   * Returns the last N non-empty log lines to aid debugging when no explicit error-pattern match is found.
+   */
+  extractTailLines(logContents: string, lineCount = 20): string[] {
+    return logContents
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(-lineCount);
+  }
+
+  /**
    * Resolves the absolute downloaded log-file path from the configured directory and filename.
    */
   resolveLogFilePath(): string {
     return path.join(this.runtimeConfig.logDownloadDirectory, this.runtimeConfig.logFileName);
+  }
+
+  /**
+   * Resolves a persisted project-local log path for the provided label.
+   */
+  resolvePersistedLogPath(fileLabel: string): string {
+    const safeLabel = fileLabel
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '') || 'extension-debug-log';
+
+    return path.join(this.runtimeConfig.persistedLogDirectory, `${safeLabel}.txt`);
   }
 }

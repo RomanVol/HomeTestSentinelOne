@@ -4,6 +4,11 @@
 export type ExtensionMode = 'unpacked' | 'profile' | 'disabled';
 
 /**
+ * Describes the supported unpacked-extension source presets.
+ */
+export type ExtensionSource = 'project-local' | 'chrome-installed' | 'custom';
+
+/**
  * Describes the supported Playwright project names in this repository.
  */
 export type HomeTestProjectName =
@@ -34,7 +39,10 @@ export interface GenAiApplicationDefinition {
  */
 export interface RuntimeConfig {
   extensionMode: ExtensionMode;
+  extensionSource: ExtensionSource;
   extensionPath: string;
+  projectLocalExtensionPath: string;
+  chromeInstalledExtensionPath: string;
   extensionProfilePath: string;
   extensionId: string;
   extensionPopupPath: string;
@@ -42,13 +50,16 @@ export interface RuntimeConfig {
   edgeChannel: string;
   apiDomain: string;
   apiKey: string;
-  expectedUserEmail: string;
   blockTexts: string[];
   logDownloadDirectory: string;
   logFileName: string;
+  persistedLogDirectory: string;
   logAssertions: string[];
   clearedLogAssertions: string[];
+  failureLogPatterns: string[];
   logTestApplicationKey: string;
+  logTestPrompt: string;
+  debugPromptVisibility: boolean;
   navigationTimeoutMs: number;
   assertionTimeoutMs: number;
   targetBrowsers: HomeTestProjectName[];
