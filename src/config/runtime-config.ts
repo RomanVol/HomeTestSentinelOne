@@ -1,4 +1,3 @@
-import os from 'node:os';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import type { PlaywrightTestConfig, Project } from '@playwright/test';
@@ -22,19 +21,6 @@ function readNumber(name: string, fallback: number): number {
   const rawValue = process.env[name]?.trim();
   const numericValue = rawValue ? Number(rawValue) : Number.NaN;
   return Number.isFinite(numericValue) ? numericValue : fallback;
-}
-
-/**
- * Reads a boolean environment variable and falls back to a default value when missing.
- */
-function readBoolean(name: string, fallback: boolean): boolean {
-  const rawValue = process.env[name]?.trim().toLowerCase();
-
-  if (!rawValue) {
-    return fallback;
-  }
-
-  return rawValue === '1' || rawValue === 'true' || rawValue === 'yes' || rawValue === 'on';
 }
 
 /**
@@ -152,18 +138,10 @@ export function loadRuntimeConfig(): RuntimeConfig {
     apiDomain: readString('HOME_TEST_API_DOMAIN', 'eu.prompt.security'),
     apiKey: readString('HOME_TEST_API_KEY', 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'),
     blockTexts: readList('HOME_TEST_BLOCK_TEXTS', ['Access Denied', 'blocked by your administrator']),
-    logDownloadDirectory: path.resolve(
-      readString('HOME_TEST_LOG_DOWNLOAD_DIR', path.join(process.env.HOME || os.homedir(), 'Downloads'))
-    ),
-    logFileName: readString('HOME_TEST_LOG_FILE_NAME', 'prompt_security_extension_debug_logs.txt'),
     persistedLogDirectory: path.resolve(
       readString('HOME_TEST_PERSISTED_LOG_DIR', path.join(process.cwd(), 'test-results', 'extension-logs'))
     ),
     logAssertions: readList('HOME_TEST_LOG_ASSERTIONS', [
-      'gemini.google.com',
-      'Blocking access to domain gemini.google.com'
-    ]),
-    clearedLogAssertions: readList('HOME_TEST_CLEARED_LOG_ASSERTIONS', [
       'gemini.google.com',
       'Blocking access to domain gemini.google.com'
     ]),
@@ -174,11 +152,6 @@ export function loadRuntimeConfig(): RuntimeConfig {
       'Explore api failed'
     ]),
     logTestApplicationKey: readString('HOME_TEST_LOG_TEST_APPLICATION_KEY', 'gemini'),
-    logTestPrompt: readString(
-      'HOME_TEST_LOG_TEST_PROMPT',
-      'Please summarize the security risks of sending customer data to a public GenAI tool.'
-    ),
-    debugPromptVisibility: readBoolean('HOME_TEST_DEBUG_PROMPT_VISIBILITY', false),
     navigationTimeoutMs: readNumber('HOME_TEST_NAVIGATION_TIMEOUT_MS', 30_000),
     assertionTimeoutMs: readNumber('HOME_TEST_ASSERTION_TIMEOUT_MS', 20_000),
     targetBrowsers: configuredProjects.length > 0 ? configuredProjects : ['chrome-extension']

@@ -6,21 +6,41 @@ test.describe('Prompt Security browser UI access policy enforcement', () => {
     test(`${application.expectedPolicy.toUpperCase()} ${application.name}`, async ({
       logger,
       browserSession,
+      extensionManagementPage,
       extensionPopupPage,
       applicationPage,
       policyEvaluator,
-      runtimeConfig
-    }) => {
+      runtimeConfig,
+      extensionLogFileService
+    }, testInfo) => {
       test.skip(
         !browserSession.extensionLoaded || !browserSession.extensionId,
         browserSession.extensionSkipReason ?? 'The extension could not be loaded for this project.'
       );
+
+      if (extensionManagementPage) {
+        await test.step('Ensure extension-management preconditions', async () => {
+          logger.info('Ensuring Chrome extension-management settings before policy assertions', {
+            application: application.name
+          });
+          await extensionManagementPage.ensureQaPreconditions();
+        });
+      }
 
       if (extensionPopupPage) {
         await test.step('Configure the extension popup', async () => {
           logger.info('Starting popup configuration step', { application: application.name });
           await extensionPopupPage.open();
           await extensionPopupPage.configureConnection();
+        });
+      }
+
+      if (extensionPopupPage && application.key === runtimeConfig.logTestApplicationKey) {
+        await test.step('Clear extension logs before collecting policy evidence', async () => {
+          logger.info('Clearing extension logs before the policy assertion that will validate log evidence', {
+            application: application.name
+          });
+          await extensionPopupPage.clearLogs();
         });
       }
 
@@ -53,6 +73,23 @@ test.describe('Prompt Security browser UI access policy enforcement', () => {
           browserSession.extensionId!
         );
       });
+
+      if (extensionPopupPage && application.key === runtimeConfig.logTestApplicationKey) {
+        await test.step('Read storage logs as supporting policy evidence', async () => {
+          const logContents = await extensionPopupPage.readDebugLogsFromStorage();
+          const persistedLogPath = await extensionLogFileService.persistLogContents(
+            logContents,
+            `${testInfo.project.name}-${application.key}-policy-evidence`
+          );
+
+          logger.info('Persisted extension storage logs after policy validation', {
+            application: application.name,
+            persistedLogPath
+          });
+
+          extensionLogFileService.assertContainsConfiguredEntries(logContents);
+        });
+      }
 
       await test.step('Log completed application policy check', async () => {
         logger.info('Completed application policy check', {

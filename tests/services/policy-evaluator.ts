@@ -66,6 +66,45 @@ export class PolicyEvaluator {
   }
 
   /**
+   * Polls until the page clearly does not show the extension's block experience for the target application.
+   */
+  async assertNotBlockedByExtension(
+    page: Page,
+    application: GenAiApplicationDefinition,
+    extensionId: string
+  ): Promise<void> {
+    this.logger.info('Asserting that the extension did not block the application', {
+      application: application.name,
+      expectedHost: application.expectedHost
+    });
+
+    await expect
+      .poll(async () => {
+        const observation = await this.collectObservation(page, extensionId);
+        const matchedBlockText = this.runtimeConfig.blockTexts.some((text) =>
+          observation.bodyText.toLowerCase().includes(text.toLowerCase())
+        );
+
+        return {
+          isExtensionOverlayUrl: observation.isExtensionOverlayUrl,
+          accessDeniedVisible: observation.accessDeniedVisible,
+          blockedByAdministratorVisible: observation.blockedByAdministratorVisible,
+          blockIndicatorVisible: observation.blockIndicatorVisible,
+          matchedBlockText
+        };
+      }, {
+        timeout: this.runtimeConfig.assertionTimeoutMs
+      })
+      .toMatchObject({
+        isExtensionOverlayUrl: false,
+        accessDeniedVisible: false,
+        blockedByAdministratorVisible: false,
+        blockIndicatorVisible: false,
+        matchedBlockText: false
+      });
+  }
+
+  /**
    * Collects the current page state that policy assertions rely on.
    */
   private async collectObservation(page: Page, extensionId: string): Promise<AccessObservation> {

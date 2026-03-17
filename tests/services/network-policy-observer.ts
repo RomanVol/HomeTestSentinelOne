@@ -48,6 +48,23 @@ export class NetworkPolicyObserver {
   }
 
   /**
+   * Starts a fresh capture window, runs the provided action, and keeps the captured traffic available for assertions.
+   */
+  async captureDuring<T>(action: () => Promise<T>): Promise<T> {
+    this.logger.info('Starting a fresh network capture window');
+    this.reset();
+
+    try {
+      return await action();
+    } finally {
+      this.logger.info('Completed network capture window', {
+        capturedRequests: this.requests.length,
+        capturedResponses: this.responses.length
+      });
+    }
+  }
+
+  /**
    * Asserts that the allowed application completed a successful top-level document response.
    */
   async assertAllowedNavigation(application: GenAiApplicationDefinition): Promise<void> {

@@ -50,12 +50,49 @@ export class PromptExtensionPopupPage {
       apiDomain: this.runtimeConfig.apiDomain
     });
 
-    await this.apiDomainInput(page).fill(this.runtimeConfig.apiDomain);
-    await this.apiKeyInput(page).fill(this.runtimeConfig.apiKey);
+    await this.fillConnectionFields(this.runtimeConfig.apiDomain, this.runtimeConfig.apiKey);
     await this.saveButton(page).click();
 
     await expect(this.apiDomainInput(page)).toHaveValue(this.runtimeConfig.apiDomain);
     await expect(this.apiKeyInput(page)).toHaveValue(this.runtimeConfig.apiKey);
+  }
+
+  /**
+   * Fills the API domain and API key fields with caller-provided values without saving them.
+   */
+  async fillConnectionFields(apiDomain: string, apiKey: string): Promise<void> {
+    const page = await this.ensurePage();
+    this.logger.info('Filling Prompt Security connection fields in popup', {
+      apiDomain
+    });
+
+    await this.apiDomainInput(page).fill(apiDomain);
+    await this.apiKeyInput(page).fill(apiKey);
+  }
+
+  /**
+   * Saves caller-provided connection values and returns the alert text when the popup reports a connection failure.
+   */
+  async configureConnectionExpectingFailure(apiDomain: string, apiKey: string): Promise<string> {
+    const page = await this.ensurePage();
+    this.logger.info('Saving Prompt Security connection values while expecting the popup to report failure', {
+      apiDomain
+    });
+
+    await this.fillConnectionFields(apiDomain, apiKey);
+
+    const dialogPromise = page.waitForEvent('dialog');
+    await this.saveButton(page).click();
+
+    const dialog = await dialogPromise;
+    const dialogMessage = dialog.message();
+    await dialog.accept();
+
+    await expect(this.saveButton(page)).toBeVisible();
+    await expect(this.apiDomainInput(page)).toHaveValue(apiDomain);
+    await expect(this.apiKeyInput(page)).toHaveValue(apiKey);
+
+    return dialogMessage;
   }
 
   /**
@@ -72,15 +109,6 @@ export class PromptExtensionPopupPage {
   }
 
   /**
-   * Clicks the popup button that asks the extension to export its debug logs.
-   */
-  async downloadLogs(): Promise<void> {
-    const page = await this.ensurePage();
-    this.logger.info('Triggering extension log download from the popup UI');
-    await this.downloadLogsButton(page).click();
-  }
-
-  /**
    * Clicks the popup button that clears the extension logs and waits for its feedback message.
    */
   async clearLogs(): Promise<void> {
@@ -91,7 +119,23 @@ export class PromptExtensionPopupPage {
   }
 
   /**
-   * Reads the extension debug logs directly from extension storage as a fallback when file export is unavailable.
+   * Reads the currently persisted popup configuration from chrome.storage.local.
+   */
+  async readStoredConnectionValues(): Promise<{ apiDomain: string; apiKey: string }> {
+    const page = await this.ensurePage();
+    this.logger.info('Reading popup configuration values from chrome.storage.local');
+
+    return page.evaluate(async () => {
+      const items = await chrome.storage.local.get(['apiDomain', 'apiKey']);
+      return {
+        apiDomain: typeof items.apiDomain === 'string' ? items.apiDomain : '',
+        apiKey: typeof items.apiKey === 'string' ? items.apiKey : ''
+      };
+    });
+  }
+
+  /**
+   * Reads the extension debug logs directly from chrome.storage.local.
    */
   async readDebugLogsFromStorage(): Promise<string> {
     const page = await this.ensurePage();

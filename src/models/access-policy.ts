@@ -51,15 +51,10 @@ export interface RuntimeConfig {
   apiDomain: string;
   apiKey: string;
   blockTexts: string[];
-  logDownloadDirectory: string;
-  logFileName: string;
   persistedLogDirectory: string;
   logAssertions: string[];
-  clearedLogAssertions: string[];
   failureLogPatterns: string[];
   logTestApplicationKey: string;
-  logTestPrompt: string;
-  debugPromptVisibility: boolean;
   navigationTimeoutMs: number;
   assertionTimeoutMs: number;
   targetBrowsers: HomeTestProjectName[];

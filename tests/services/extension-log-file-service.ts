@@ -5,24 +5,13 @@ import type { RuntimeConfig } from '../../src/models/access-policy';
 import { StepLogger } from '../../src/core/logger';
 
 /**
- * Handles downloaded extension-log files so UI tests can assert real exported log contents.
+ * Persists extension debug logs so tests can assert storage-backed log contents.
  */
 export class ExtensionLogFileService {
   /**
    * Creates a log-file service bound to the current runtime configuration.
    */
   constructor(private readonly runtimeConfig: RuntimeConfig, private readonly logger: StepLogger) {}
-
-  /**
-   * Ensures that the configured log-download directory exists before tests use it.
-   */
-  async ensureDownloadDirectory(): Promise<void> {
-    this.logger.info('Ensuring the configured log-download directory exists', {
-      logDownloadDirectory: this.runtimeConfig.logDownloadDirectory
-    });
-
-    await fs.mkdir(this.runtimeConfig.logDownloadDirectory, { recursive: true });
-  }
 
   /**
    * Ensures that the configured persisted-log directory exists before tests write storage logs to disk.
@@ -36,47 +25,6 @@ export class ExtensionLogFileService {
   }
 
   /**
-   * Removes any stale downloaded log file so a new export can be detected deterministically.
-   */
-  async deleteExistingLogFile(): Promise<void> {
-    const logFilePath = this.resolveLogFilePath();
-    this.logger.info('Removing stale downloaded log file if it already exists', { logFilePath });
-    await fs.rm(logFilePath, { force: true });
-  }
-
-  /**
-   * Waits until the downloaded log file appears on disk and then returns its contents.
-   */
-  async waitForDownloadedLogContents(): Promise<string> {
-    const logFilePath = this.resolveLogFilePath();
-    this.logger.info('Waiting for the extension log file to appear', { logFilePath });
-
-    await expect
-      .poll(async () => {
-        try {
-          const fileContents = await fs.readFile(logFilePath, 'utf8');
-          return fileContents.trim();
-        } catch {
-          return '';
-        }
-      }, {
-        timeout: this.runtimeConfig.assertionTimeoutMs
-      })
-      .not.toBe('');
-
-    return this.readCurrentLogContents();
-  }
-
-  /**
-   * Reads the current downloaded log file without polling.
-   */
-  async readCurrentLogContents(): Promise<string> {
-    const logFilePath = this.resolveLogFilePath();
-    this.logger.info('Reading the current downloaded log file', { logFilePath });
-    return fs.readFile(logFilePath, 'utf8');
-  }
-
-  /**
    * Writes the provided log contents to a deterministic file under the configured persisted-log directory.
    */
   async persistLogContents(logContents: string, fileLabel: string): Promise<string> {
@@ -87,10 +35,10 @@ export class ExtensionLogFileService {
   }
 
   /**
-   * Asserts that all configured required log snippets are present in the exported file.
+   * Asserts that all configured required log snippets are present in the persisted log contents.
    */
   assertContainsConfiguredEntries(logContents: string): void {
-    this.logger.info('Asserting that the downloaded log file contains the configured snippets', {
+    this.logger.info('Asserting that the persisted extension logs contain the configured snippets', {
       assertions: this.runtimeConfig.logAssertions
     });
 
@@ -100,20 +48,7 @@ export class ExtensionLogFileService {
   }
 
   /**
-   * Asserts that all configured cleared-log snippets are absent from the exported file.
-   */
-  assertClearedEntriesAreAbsent(logContents: string): void {
-    this.logger.info('Asserting that the cleared log export no longer contains the configured snippets', {
-      clearedAssertions: this.runtimeConfig.clearedLogAssertions
-    });
-
-    for (const absentEntry of this.runtimeConfig.clearedLogAssertions) {
-      expect(logContents).not.toContain(absentEntry);
-    }
-  }
-
-  /**
-   * Extracts relevant error lines from the exported log file using the configured failure patterns.
+   * Extracts relevant error lines from the persisted log contents using the configured failure patterns.
    */
   extractRelevantErrorLines(logContents: string): string[] {
     const normalizedLines = logContents
@@ -143,13 +78,6 @@ export class ExtensionLogFileService {
       .map((line) => line.trim())
       .filter(Boolean)
       .slice(-lineCount);
-  }
-
-  /**
-   * Resolves the absolute downloaded log-file path from the configured directory and filename.
-   */
-  resolveLogFilePath(): string {
-    return path.join(this.runtimeConfig.logDownloadDirectory, this.runtimeConfig.logFileName);
   }
 
   /**

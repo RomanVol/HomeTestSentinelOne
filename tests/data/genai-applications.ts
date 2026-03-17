@@ -1,7 +1,8 @@
 import type { GenAiApplicationDefinition } from '../../src/models/access-policy';
 
 /**
- * Defines the policy expectations that the home test requires.
+ * Defines the policy expectations that the home test requires, including additional blocked
+ * web GenAI applications to cover the "others like gemini.google.com" wording.
  */
 export const genAiApplications: readonly GenAiApplicationDefinition[] = [
   {
@@ -17,18 +18,26 @@ export const genAiApplications: readonly GenAiApplicationDefinition[] = [
     url: 'https://gemini.google.com/',
     expectedPolicy: 'block',
     expectedHost: 'gemini.google.com'
+  },
+  {
+    key: 'claude',
+    name: 'Claude',
+    url: 'https://claude.ai/',
+    expectedPolicy: 'block',
+    expectedHost: 'claude.ai'
+  },
+  {
+    key: 'perplexity',
+    name: 'Perplexity',
+    url: 'https://www.perplexity.ai/',
+    expectedPolicy: 'block',
+    expectedHost: 'www.perplexity.ai'
+  },
+  {
+    key: 'copilot',
+    name: 'Microsoft Copilot',
+    url: 'https://copilot.microsoft.com/',
+    expectedPolicy: 'block',
+    expectedHost: 'copilot.microsoft.com'
   }
 ] as const;
-
-/**
- * Resolves an application definition by key so other tests can select a target dynamically.
- */
-export function getGenAiApplicationByKey(key: string): GenAiApplicationDefinition {
-  const application = genAiApplications.find((candidate) => candidate.key === key);
-
-  if (!application) {
-    throw new Error(`Unknown GenAI application key "${key}". Update HOME_TEST_LOG_TEST_APPLICATION_KEY or tests/data/genai-applications.ts.`);
-  }
-
-  return application;
-}

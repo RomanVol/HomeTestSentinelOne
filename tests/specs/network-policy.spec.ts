@@ -6,6 +6,7 @@ test.describe('Prompt Security network-level policy enforcement', () => {
     test(`enforces ${application.expectedPolicy.toUpperCase()} ${application.name} at the navigation/request level`, async ({
       logger,
       browserSession,
+      extensionManagementPage,
       extensionPopupPage,
       applicationPage,
       networkPolicyObserver
@@ -14,6 +15,15 @@ test.describe('Prompt Security network-level policy enforcement', () => {
         !browserSession.extensionLoaded || !browserSession.extensionId,
         browserSession.extensionSkipReason ?? 'The extension could not be loaded for this project.'
       );
+
+      if (extensionManagementPage) {
+        await test.step('Ensure extension-management preconditions', async () => {
+          logger.info('Ensuring Chrome extension-management settings before network assertions', {
+            application: application.name
+          });
+          await extensionManagementPage.ensureQaPreconditions();
+        });
+      }
 
       const popupPage = extensionPopupPage!;
 
@@ -25,12 +35,10 @@ test.describe('Prompt Security network-level policy enforcement', () => {
         await popupPage.configureConnection();
       });
 
-      await test.step('Reset observed network traffic', async () => {
-        networkPolicyObserver.reset();
-      });
-
       await test.step(`Navigate to ${application.name} and capture the network behavior`, async () => {
-        await applicationPage.goto(application);
+        await networkPolicyObserver.captureDuring(async () => {
+          await applicationPage.goto(application);
+        });
       });
 
       await test.step('Assert the expected network outcome', async () => {
@@ -47,4 +55,3 @@ test.describe('Prompt Security network-level policy enforcement', () => {
     });
   }
 });
-
