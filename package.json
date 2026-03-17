@@ -5,6 +5,7 @@
   "description": "Prompt Security browser extension home test automation project.",
   "scripts": {
     "test": "playwright test --project=chrome-extension",
+    "test:ci": "playwright test --project=chrome-extension --reporter=line",
     "test:headed": "playwright test --project=chrome-extension --headed",
     "test:all-browsers": "playwright test",
     "test:chrome": "playwright test --project=chrome-extension",
@@ -17,4 +18,3 @@
     "typescript": "^5.9.2"
   }
 }
-
