@@ -2,6 +2,8 @@
 
 Playwright-based QA automation framework for validating Prompt Security browser-extension policy behavior against web-based GenAI applications.
 
+For a short install-and-run guide, see [RUNNING.md](/Users/roma/PlaywrightExtention/RUNNING.md).
+
 ## Scope
 
 The framework validates the requested policy:
@@ -98,6 +100,92 @@ HOME_TEST_EXTENSION_SOURCE=custom HOME_TEST_EXTENSION_PATH="/absolute/path/to/un
 ```bash
 npm run test:all-browsers
 ```
+
+## How To Run The Assignment Tests
+
+The requirement in [REQUIREMENTS.md](/Users/roma/PlaywrightExtention/REQUIREMENTS.md) is to confirm that the extension:
+
+- allows `chatgpt.com`
+- blocks `gemini.google.com`
+- covers "others like" Gemini through additional blocked web GenAI applications
+
+Use this execution flow.
+
+### Local Execution
+
+1. Install dependencies:
+
+```bash
+npm ci
+```
+
+2. Create your local config file:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Update `.env.local` if you need different local values for:
+
+- `HOME_TEST_API_DOMAIN`
+- `HOME_TEST_API_KEY`
+- extension source or path overrides
+
+4. Run the main assignment policy suite:
+
+```bash
+npm test
+```
+
+This runs the default `chrome-extension` Playwright project and executes the test specs in [tests/specs](/Users/roma/PlaywrightExtention/tests/specs), including the browser UI policy coverage in [access-policy.spec.ts](/Users/roma/PlaywrightExtention/tests/specs/access-policy.spec.ts).
+
+5. Run the full local QA suite when you want broader coverage:
+
+```bash
+npm run test:ci
+```
+
+or headed:
+
+```bash
+npm run test:headed
+```
+
+`test:ci` prints the suite output directly in the terminal with the Playwright `line` reporter.
+
+### What Local Runs Use
+
+Local execution resolves configuration in this order:
+
+1. values from `.env.local`, when that file exists
+2. otherwise the built-in defaults from [runtime-config.ts](/Users/roma/PlaywrightExtention/src/config/runtime-config.ts)
+
+One of those configuration values is the extension source. Unless you override it, the default extension source is `project-local`, which means the unpacked extension is loaded from:
+
+- [Prompt-Security-Browser-Extension](/Users/roma/PlaywrightExtention/Prompt-Security-Browser-Extension)
+
+unless you override the source with environment variables such as:
+
+- `HOME_TEST_EXTENSION_SOURCE=chrome-installed`
+- `HOME_TEST_EXTENSION_SOURCE=custom`
+- `HOME_TEST_EXTENSION_PATH=/absolute/path/to/unpacked-extension`
+
+### CI Execution
+
+The GitHub Actions workflow runs the suite without `.env.local`.
+
+In CI:
+
+- GitHub Actions sets `CI=true`
+- the framework does not load `.env.local`
+- the framework falls back to explicit workflow env vars or the built-in defaults
+- the unpacked extension is loaded from the project directory [Prompt-Security-Browser-Extension](/Users/roma/PlaywrightExtention/Prompt-Security-Browser-Extension) unless the workflow overrides the extension source/path
+
+So the default CI behavior is:
+
+1. check out the repository
+2. use the extension folder committed in the repo
+3. run the Playwright suite and print the results in the workflow logs
 
 ## Default Local Extension Sources
 
