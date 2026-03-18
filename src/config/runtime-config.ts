@@ -1,11 +1,59 @@
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { PlaywrightTestConfig, Project } from '@playwright/test';
 import type { BrowserFlavor, ExtensionSource, HomeTestProjectName, RuntimeConfig } from '../models/access-policy';
 
 const defaultChromeInstalledExtensionPath =
   '/Users/roma/Library/Application Support/Google/Chrome/Default/Extensions/iidnankcocecmgpcafggbgbmkbcldmno/7.0.40_0';
 const defaultProjectLocalExtensionPath = path.join(process.cwd(), 'Prompt-Security-Browser-Extension');
+const defaultLocalEnvPath = path.join(process.cwd(), '.env.local');
+
+let localEnvLoaded = false;
+
+/**
+ * Loads `.env.local` for local runs without overriding explicitly provided environment variables.
+ */
+function loadLocalEnvFile(): void {
+  if (localEnvLoaded || process.env.CI || !existsSync(defaultLocalEnvPath)) {
+    localEnvLoaded = true;
+    return;
+  }
+
+  const fileContents = readFileSync(defaultLocalEnvPath, 'utf8');
+
+  for (const rawLine of fileContents.split(/\r?\n/)) {
+    const trimmedLine = rawLine.trim();
+
+    if (!trimmedLine || trimmedLine.startsWith('#')) {
+      continue;
+    }
+
+    const equalsIndex = trimmedLine.indexOf('=');
+
+    if (equalsIndex <= 0) {
+      continue;
+    }
+
+    const name = trimmedLine.slice(0, equalsIndex).trim();
+
+    if (!name || process.env[name] !== undefined) {
+      continue;
+    }
+
+    let value = trimmedLine.slice(equalsIndex + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith('\'') && value.endsWith('\''))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[name] = value;
+  }
+
+  localEnvLoaded = true;
+}
 
 /**
  * Reads a string environment variable and falls back to a default value when missing.
@@ -105,6 +153,8 @@ function normalizeProjectName(name: string): HomeTestProjectName | null {
  * Loads the full runtime configuration from the environment for tests and fixtures.
  */
 export function loadRuntimeConfig(): RuntimeConfig {
+  loadLocalEnvFile();
+
   const configuredProjects = readList('HOME_TEST_TARGET_BROWSERS', ['chrome-extension'])
     .map(normalizeProjectName)
     .filter((value): value is HomeTestProjectName => value !== null);

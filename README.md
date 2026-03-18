@@ -71,7 +71,9 @@ Important limitation:
 npm ci
 ```
 
-2. Copy `.env.example` to `.env` if you want local overrides.
+2. Copy `.env.example` to `.env.local` if you want local overrides.
+
+`loadRuntimeConfig()` automatically reads `.env.local` for local runs. In CI, when no env file is present, the framework falls back to the built-in defaults unless the workflow provides explicit environment variables.
 
 3. Run the default Chrome policy suite:
 
